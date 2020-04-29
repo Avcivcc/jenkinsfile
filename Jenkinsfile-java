@@ -1,0 +1,26 @@
+node ("salver-192.168.6.132") {
+   //def mvnHome = '/opt/apache-maven-3.6.3'
+   stage('git checkout') { 
+        checkout([$class: 'GitSCM', branches: [[name: '${branch}']], doGenerateSubmoduleConfigurations: false, extensions: [], submoduleCfg: [], userRemoteConfigs: [[url: 'https://github.com/Avcivcc/test.git']]])
+   }
+   stage('maven build') {
+        sh '''export JAVA_HOME=/opt/java/jdk1.8.0_231
+        /opt/apache-maven-3.6.3/bin/mvn clean package -Dmaven.test.skip=true'''
+   }
+   stage('deploy') {
+        sh '''
+        JENKINS_NODE_COOKIE=dontkillme
+        export JAVA_HOME=/opt/java/jdk1.8.0_231
+        TOMCAT_NAME=apache-tomcat-8.5.31
+        TOMCAT_HOME=/usr/local/$TOMCAT_NAME
+        WWWROOT=$TOMCAT_HOME/webapps/
+
+        if [ -d $WWWROOT ]; then
+           mv $WWWROOT /data/backup/${TOMCAT_NAME}-$(date +"%F_%T")
+        fi
+        unzip ${WORKSPACE}/target/*.war -d $WWWROOT
+        PID=$(ps -ef |grep $TOMCAT_NAME |egrep -v "grep|$$" |awk \'{print $2}\')
+        [ -n "$PID" ] && kill -9 $PID
+        /bin/bash $TOMCAT_HOME/bin/startup.sh'''
+   }
+}
